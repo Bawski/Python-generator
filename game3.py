@@ -7,9 +7,14 @@ def generate_targeted_patient():
     # Hits your 12% High Risk and 35% Moderate Risk targets exactly
     classification = random.choices(
         ["High Risk", "Moderate Risk", "Low Risk"], 
-        weights=[0.4, 0.38, 0.58]
+        weights=[12, 35, 53]
     )[0]
-    
+    # --- INITIALIZATION: Set "Safe" Baseline ---
+    # This starts everyone as healthy so the 'Brain' can then add risks
+    systolic, diastolic = random.randint(110, 125), random.randint(70, 85)
+    proteinuria, family_history = "No", "No"
+    chronic_htn, diabetes, kidney, autoimmune = "No", "No", "No", "No"
+    trigger = "None" # Prevents errors in the BMI section
     # 2. CORE CONSTRAINTS (Age & Gravidity)
     # Determining these early prevents "UnboundLocalError"
     
@@ -32,6 +37,10 @@ def generate_targeted_patient():
         gravidity = random.choices([1, 2, 3, 4, 5, 6], weights=[0.11, 0.34, 0.30, 0.15, 0.06, 0.04])[0]
     
     is_first_preg = (gravidity == 1)
+    # Define Obstetric History based on whether it is her first pregnancy
+    prev_hbp = "N/A" if is_first_preg else "No"
+    prev_pe = "N/A" if is_first_preg else "No"
+    interval = "Not Applicable (First pregnancy)" if is_first_preg else "<10 years"
 
     # --- SECTION A: SOCIODEMOGRAPHIC DATA ---
     marital = random.choices(["Married", "Single", "Widowed", "Divorced/Separated"], weights=[0.98, 0.01, 0.005, 0.005])[0]
@@ -72,11 +81,11 @@ def generate_targeted_patient():
     # --- SECTION B: OBSTETRIC PREDICTORS ---
     gest_age = random.choices([random.randint(28, 36), random.randint(37, 40), random.randint(8, 27)], weights=[0.511, 0.378, 0.111])[0]
     parity = 0 if is_first_preg else max(0, gravidity - random.choices([1, 2], weights=[0.9, 0.1])[0])
-    multiples = random.choices(["Yes", "No"], weights=[0.09, 0.91])[0]
+    multiples = random.choices(["Yes", "No"], weights=[0.03, 0.97])[0]
     # --- THE "BRAIN": Forcing the Narrative ---
     if classification == "High Risk":
         # Force 33% of High Risk cases to be "Multiples", 67% to be others
-        path = random.choices(["Multiples", "OtherFactors"], weights=[0.3, 0.97])[0]
+        path = random.choices(["Multiples", "OtherFactors"], weights=[0.1, 0.9])[0]
         
         if path == "Multiples":
             multiples = "Yes"
@@ -86,10 +95,18 @@ def generate_targeted_patient():
             # The remaining 67% follow the existing logic
             sub_path = random.choice(["HighFactor", "ModOverlap"])
             if sub_path == "HighFactor":
-                trigger = random.choice(["SevereBP", "PE", "Conditions"])
+                trigger = random.choices(["SevereBP", "PE", "Conditions"], weights=[0.3, 0.2, 0.5])[0]
                 if trigger == "SevereBP": systolic, diastolic = random.randint(160, 190), random.randint(110, 120)
                 elif trigger == "PE": systolic, proteinuria = random.randint(140, 155), "Yes"
-                else: chronic_htn = "Yes" # etc.
+                else: 
+                    # This tells the computer WHICH condition to make 'Yes'
+                    # Weights: HTN (40%), DM (40%), Kidney (10%), Autoimmune (10%)
+                    cond = random.choices(["HTN", "DM", "Kidney", "Autoimmune"], weights=[40, 40, 19, 1])[0]
+                    
+                    if cond == "HTN": chronic_htn = "Yes"
+                    elif cond == "DM": diabetes = "Yes"
+                    elif cond == "Kidney": kidney = "Yes"
+                    else: autoimmune = "Yes"
             else:
                 family_history, bmi = "Yes", random.randint(36, 42)
 
@@ -123,15 +140,6 @@ def generate_targeted_patient():
     # Formula: Weight = BMI * (Height^2)
     weight = round(bmi * (height ** 2), 1)
 
-    # --- SECTION C & D: BACKFILL LOGIC ---
-    # Initialize Defaults
-    systolic, diastolic = random.randint(110, 125), random.randint(70, 85)
-    proteinuria, family_history, multiples = "No", "No", "No"
-    chronic_htn, diabetes, kidney, autoimmune = "No", "No", "No", "No"
-    prev_hbp = "N/A" if is_first_preg else "No"
-    prev_pe = "N/A" if is_first_preg else "No"
-    interval = "Not Applicable (First pregnancy)" if is_first_preg else "<10 years"
-    # 3. Multiple Gestation: (e.g., twins)
     
     # --- RETURN DATA ---
     return {
